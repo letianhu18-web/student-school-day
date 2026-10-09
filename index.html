@@ -1,0 +1,611 @@
+<!doctype html><html lang="zh-CN"><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>今天也要平安放学 · 学生视角校园小游戏</title>
+
+
+<style>
+/* Layout: start sheet in a 560px column; in play, a full-screen top-down campus canvas under a blackboard HUD, events slide up as 聯絡簿 paper sheets */
+:root{
+  --paper:#eef1ea; --sheet:#fbfcf8; --ink:#1d2725; --muted:#5f6b66; --rule:#cfd8d0;
+  --blue:#2b4b9b; --red:#c3352b; --board:#2c443a; --board-ink:#eef3ea; --chalk:#f2d36b;
+  --good:#2f7a52; --shadow:0 1px 0 rgba(29,39,37,.08),0 6px 18px -10px rgba(29,39,37,.35);
+  --f-display:"Noto Serif SC","SimSun","PMingLiU",serif;
+  --f-hand:"KaiTi","Kaiti TC","DFKai-SB","BiauKai",serif;
+  --f-ui:"Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#121815; --sheet:#1b2320; --ink:#e4e9e3; --muted:#9aa7a0; --rule:#2c3833;
+  --blue:#93abff; --red:#ff6d5e; --board:#22362e; --board-ink:#eef3ea; --chalk:#f2d36b;
+  --good:#6fd39a; --shadow:0 1px 0 rgba(0,0,0,.4),0 8px 22px -12px rgba(0,0,0,.8); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#121815; --sheet:#1b2320; --ink:#e4e9e3; --muted:#9aa7a0; --rule:#2c3833;
+  --blue:#93abff; --red:#ff6d5e; --board:#22362e; --board-ink:#eef3ea; --chalk:#f2d36b;
+  --good:#6fd39a; --shadow:0 1px 0 rgba(0,0,0,.4),0 8px 22px -12px rgba(0,0,0,.8); color-scheme:dark}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--paper);color:var(--ink);font-family:var(--f-ui);font-size:15px;line-height:1.6}
+.wrap{max-width:560px;margin:0 auto;padding-inline:16px;padding-block:0 48px}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+h1,h2,h3{text-wrap:balance;margin:0}
+
+/* Game shell */
+#game{position:fixed;inset:0;display:flex;flex-direction:column;background:#33402f;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.hud{background:var(--board);color:var(--board-ink);padding:8px 14px 9px;display:grid;gap:6px;border-bottom:3px solid #6b5132;flex:none}
+.hud-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.who{font-size:12px;opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.clock{font-family:var(--f-display);font-weight:900;font-size:28px;line-height:1;font-variant-numeric:tabular-nums;color:var(--chalk)}
+.hud-right{display:flex;align-items:center;gap:10px}
+.peace{text-align:right;font-size:10px;letter-spacing:.08em;opacity:.85;line-height:1.3}
+.peace b{display:block;font-size:18px;letter-spacing:0;font-variant-numeric:tabular-nums;color:var(--board-ink)}
+.pausebtn{background:transparent;border:1px solid rgba(255,255,255,.35);color:var(--board-ink);border-radius:4px;padding:4px 8px;font-size:12px}
+.meters{display:grid;grid-template-columns:auto 1fr auto;gap:3px 8px;align-items:center;font-size:11px}
+.bar{height:7px;border-radius:2px;background:rgba(255,255,255,.14);overflow:hidden;position:relative}
+.bar i{display:block;height:100%;transition:width .5s ease}
+.bar.comp i{background:linear-gradient(90deg,#e9c46a,#e76f51 60%,#ff3b30)}
+.bar.stress i{background:#9ec5e8}
+.lvl{font-variant-numeric:tabular-nums;min-width:5.5em;text-align:right}
+.rels{display:flex;gap:5px;flex-wrap:wrap;font-size:10.5px}
+.rels span{padding:0 6px;border:1px solid rgba(255,255,255,.25);border-radius:999px;font-variant-numeric:tabular-nums}
+.goal{font-size:12px;color:var(--chalk);min-width:0}
+.goalrow{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;justify-content:space-between}
+.inv{display:flex;gap:4px;flex-wrap:wrap}
+.inv span{font-size:10.5px;color:#fff;padding:1px 6px;border-radius:3px}
+.snark{font-family:var(--f-hand);font-size:16px;line-height:1.6;color:var(--blue);margin:0}
+.snark b{font-family:var(--f-ui);font-size:12px;letter-spacing:.08em}
+.shieldmsg{border-left-color:var(--good)!important;background:color-mix(in srgb,var(--good) 10%,var(--sheet))!important}
+.disc{font-size:12px;color:var(--red);margin-top:10px;letter-spacing:.05em}
+.lede b{color:var(--red)}
+#stage{position:relative;flex:1;min-height:0;overflow:hidden}
+#cv{display:block;width:100%;height:100%;touch-action:none;user-select:none;-webkit-user-select:none}
+#toast{position:absolute;left:50%;bottom:44px;transform:translateX(-50%);max-width:calc(100% - 32px);background:rgba(20,26,23,.88);color:#f3f1e6;padding:7px 14px;border-radius:6px;font-size:13.5px;text-align:center;pointer-events:none;transition:opacity .3s;opacity:0}
+#toast.on{opacity:1}
+#shade{position:absolute;inset:0;background:rgba(10,14,12,.45)}
+#modal{position:absolute;left:0;right:0;bottom:0;max-height:86%;overflow-y:auto;padding:0 12px 14px;overscroll-behavior:contain}
+#modal .sheet{max-width:560px;margin:0 auto}
+#pauseMsg{position:absolute;inset:0;display:grid;place-items:center;background:rgba(10,14,12,.55);color:#fff;font-family:var(--f-display);font-size:28px;letter-spacing:.3em}
+.ctlhint{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);font-size:12px;color:#fff;background:rgba(0,0,0,.45);padding:4px 10px;border-radius:999px;pointer-events:none;white-space:nowrap;transition:opacity .6s}
+
+/* Paper sheet */
+.sheet{background:var(--sheet);border:1px solid var(--rule);border-radius:4px;box-shadow:var(--shadow);margin-top:16px;padding:18px 18px 20px;position:relative;
+  background-image:repeating-linear-gradient(to bottom,transparent 0 31px,var(--rule) 31px 32px);background-position:0 12px}
+.sheet-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.cat{font-family:var(--f-display);font-weight:900;color:var(--red);border:2px solid var(--red);padding:0 6px;border-radius:3px;letter-spacing:.1em;transform:rotate(-3deg);display:inline-block;background:var(--sheet)}
+.sheet h2{font-family:var(--f-display);font-weight:900;font-size:21px;line-height:1.35;margin-top:10px}
+.narr{font-family:var(--f-hand);font-size:17.5px;line-height:32px;margin:8px 0 0;max-width:60ch}
+.choices{display:grid;gap:9px;margin-top:14px}
+.card{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;padding:11px 13px;background:var(--sheet);border:1.5px solid var(--ink);border-radius:6px;box-shadow:3px 3px 0 var(--ink);transition:transform .12s, box-shadow .12s}
+.card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+.card:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
+.card .k{flex:none;width:26px;height:26px;border-radius:50%;border:1.5px solid var(--blue);color:var(--blue);font-weight:700;display:grid;place-items:center;font-size:13px}
+.card .t{min-width:0;font-size:15px;font-weight:500;line-height:1.5;padding-top:1px}
+.card[disabled]{opacity:.35;box-shadow:none;cursor:default;transform:none}
+
+.hint3{font-size:12px;color:var(--muted);margin-top:8px}
+.result{margin-top:16px;padding-top:14px;border-top:2px dashed var(--rule);display:grid;gap:10px}
+.result .narr{margin:0}
+.stamp{justify-self:start;font-family:var(--f-display);font-weight:900;font-size:24px;color:var(--red);border:3px double var(--red);padding:2px 12px;letter-spacing:.15em;transform:rotate(-6deg);animation:slam .45s cubic-bezier(.2,1.6,.4,1) both}
+.stamp.calm{color:var(--good);border-color:var(--good);font-size:18px}
+@keyframes slam{from{transform:scale(2.4) rotate(-14deg);opacity:0}to{transform:scale(1) rotate(-6deg);opacity:1}}
+.reason{font-size:14px;color:var(--red);font-weight:500}
+.deltas{display:flex;flex-wrap:wrap;gap:6px}
+.deltas span{font-size:12px;padding:1px 8px;border-radius:3px;background:var(--paper);border:1px solid var(--rule);font-variant-numeric:tabular-nums}
+.deltas .bad{color:var(--red)}
+.deltas .ok{color:var(--good)}
+.issue{font-size:12px;color:var(--muted)}
+.issue b{color:var(--ink);font-weight:500}
+.omen{font-family:var(--f-hand);font-size:15px;color:var(--muted)}
+.alert{font-size:13px;padding:8px 10px;border-left:4px solid var(--red);background:color-mix(in srgb,var(--red) 8%,var(--sheet))}
+.go{justify-self:stretch;margin-top:4px;padding:12px;border:none;border-radius:6px;background:var(--ink);color:var(--sheet);font-weight:700;letter-spacing:.1em}
+
+/* Start */
+.hero{padding-block:36px 8px}
+.eyebrow{font-size:12px;letter-spacing:.2em;color:var(--muted)}
+.title{font-family:var(--f-display);font-weight:900;font-size:clamp(38px,11vw,60px);line-height:1.1;margin-top:8px;letter-spacing:.02em}
+.title em{font-style:normal;color:var(--red)}
+.tag{font-family:var(--f-hand);font-size:20px;margin-top:10px}
+.lede{color:var(--muted);max-width:52ch;margin-top:8px}
+.how{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:14px;font-size:13px}
+.how div{padding:8px 10px;border:1px solid var(--rule);border-radius:4px;background:var(--sheet)}
+.how b{display:block;font-size:13px}
+.tcard{margin-top:20px}
+.tname{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.tname h3{font-family:var(--f-display);font-size:22px}
+.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 16px;margin-top:10px;font-size:13px}
+.stat{display:grid;grid-template-columns:5.5em 1fr 2em;gap:6px;align-items:center}
+.stat .bar{background:var(--rule);height:6px}
+.stat .bar i{background:var(--blue)}
+.stat span:last-child{text-align:right;font-variant-numeric:tabular-nums}
+.talents{display:grid;gap:8px;margin-top:14px}
+.tal{padding:8px 10px;border:1px dashed var(--muted);border-radius:4px;background:var(--sheet)}
+.tal b{color:var(--red)}
+.tal p{margin:2px 0 0;font-size:13px;color:var(--muted)}
+.sys{font-family:var(--f-hand);font-size:17px;margin-top:12px;color:var(--blue)}
+.row{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+.row button{flex:1 1 140px;padding:12px;border-radius:6px;font-weight:700;letter-spacing:.08em}
+.primary{background:var(--red);color:#fff;border:none}
+.ghost{background:transparent;border:1.5px solid var(--ink)}
+.best{font-size:12px;color:var(--muted);margin-top:10px}
+
+.big-btn{display:block;width:100%;max-width:320px;margin-top:22px;padding:15px;border-radius:8px;font-size:17px;font-weight:700;letter-spacing:.1em}
+.lede b{color:var(--red);font-size:1.15em}
+.nth{font-size:18px;margin-top:10px}
+.nth b{font-family:var(--f-display);font-size:30px;color:#ff4b3e;font-variant-numeric:tabular-nums}
+.over.win .nth b{color:var(--red)}
+.realbox{margin-top:22px;padding:16px;border:1px solid rgba(255,255,255,.25);border-radius:6px;background:rgba(255,255,255,.04)}
+.realbox p{margin:8px 0 0;font-size:15.5px;line-height:1.75}
+.realtag{display:inline-block;font-family:var(--f-display);font-weight:900;color:#ff4b3e;border:2px solid #ff4b3e;padding:0 8px;letter-spacing:.15em;transform:rotate(-3deg)}
+.realbox .res{opacity:.85}
+.src{font-size:13px;opacity:.7}
+.over a{color:inherit}
+.hurt{font-family:var(--f-display);font-weight:900;font-size:19px;margin:0}
+.small{font-size:13.5px;opacity:.75;margin:10px 0 0;line-height:1.7}
+.skiplist{margin:10px 0 0;padding-left:1.4em;font-family:var(--f-hand);font-size:17px;line-height:1.8}
+.flow{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;font-size:11px;white-space:nowrap}
+.flow::-webkit-scrollbar{display:none}
+.flow span{padding:1px 7px;border-radius:999px;border:1px solid rgba(255,255,255,.22);opacity:.6}
+.flow span.done{opacity:.35;text-decoration:line-through}
+.flow span.now{opacity:1;background:var(--chalk);color:#1d2725;border-color:var(--chalk);font-weight:700}
+#banner{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%) scale(.96);text-align:center;color:#fff;background:rgba(20,26,23,.86);padding:14px 26px;border-radius:10px;pointer-events:none;opacity:0;transition:opacity .35s,transform .35s;max-width:calc(100% - 32px)}
+#banner.on{opacity:1;transform:translate(-50%,-50%) scale(1)}
+#banner b{display:block;font-family:var(--f-display);font-size:30px;letter-spacing:.08em;color:var(--chalk)}
+#banner span{display:block;font-size:15px;margin-top:4px}
+.flowline{font-size:13px;color:var(--muted);margin-top:12px;line-height:1.8}
+.sbtns{display:flex;gap:6px}
+.sbtn{background:transparent;border:1px solid rgba(255,255,255,.35);color:var(--board-ink);border-radius:4px;padding:2px 8px;font-size:11.5px}
+.speak{margin-left:auto;background:transparent;border:1px solid var(--blue);color:var(--blue);border-radius:999px;padding:1px 10px;font-size:12px}
+.realbox .speak{border-color:currentColor;color:inherit;margin-left:10px;vertical-align:middle;opacity:.8}
+/* Over */
+.over{position:fixed;inset:0;z-index:20;overflow-y:auto;background:#0d0f0e;color:#e9ece8;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.over.win{background:var(--paper);color:var(--ink)}
+.over .wrap{padding-block:40px 60px}
+.big{font-family:var(--f-display);font-weight:900;font-size:clamp(40px,12vw,64px);letter-spacing:.12em;line-height:1.1}
+.over:not(.win) .big{color:#ff4b3e;animation:fadein 1.2s ease both}
+@keyframes fadein{from{opacity:0;letter-spacing:.5em}to{opacity:1}}
+.crimes{margin:18px 0 0;padding-left:1.6em;font-family:var(--f-hand);font-size:18px;line-height:1.75}
+.crimes li.pad{opacity:.65}
+.sect{margin-top:28px;border-top:1px solid rgba(255,255,255,.18);padding-top:16px}
+.over.win .sect{border-top-color:var(--rule)}
+.sect h3{font-size:13px;letter-spacing:.2em;opacity:.7;font-weight:500}
+.report{display:grid;grid-template-columns:7em 1fr;gap:6px 12px;margin-top:10px;font-size:14px}
+.report dt{opacity:.65}
+.report dd{margin:0;min-width:0}
+.idx{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px}
+.idx div{font-size:12px;opacity:.75}
+.idx b{display:block;font-family:var(--f-display);font-size:28px;opacity:1;font-variant-numeric:tabular-nums}
+.ledger{list-style:none;padding:0;margin:10px 0 0;display:grid;gap:8px;font-family:var(--f-hand);font-size:17px}
+.ledger li{display:grid;grid-template-columns:3.4em 1fr;gap:8px}
+.ledger time{font-family:var(--f-ui);font-size:12px;opacity:.6;padding-top:4px;font-variant-numeric:tabular-nums}
+.tribute{font-family:var(--f-hand);font-size:19px;line-height:1.9;margin-top:12px;max-width:34em}
+.tribute p{margin:0 0 10px}
+.over .row .ghost{border-color:currentColor}
+.ending-name{font-family:var(--f-display);font-weight:900;font-size:24px;color:var(--red);margin-top:6px}
+.fade-in{animation:rise .3s ease both}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="wrap" id="startWrap"><main id="main"></main></div>
+<div id="game" hidden>
+  <div class="hud">
+    <div class="hud-top">
+      <div style="min-width:0"><div class="who" id="who">第 1 天</div><div class="clock" id="clock">07:30</div></div>
+      <div class="hud-right">
+        <div class="peace">今天忍下的事<b id="skips">0</b></div>
+        <button class="pausebtn" id="pauseBtn" aria-label="暂停">暂停</button>
+      </div>
+    </div>
+    <div class="meters"><span>精力</span><div class="bar energy" id="energyMeter" role="progressbar" aria-label="精力" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><i id="energyBar"></i></div><span class="lvl" id="energyNum">100/100</span><span>压力</span><div class="bar pressure" id="stressMeter" role="progressbar" aria-label="压力" aria-valuemin="0" aria-valuemax="100" aria-valuenow="10"><i id="stressBar"></i></div><span class="lvl" id="stressNum">10/100</span></div><div class="meter-rule">压力到 100 或精力降到 0：淘汰</div><div class="flow" id="flow"></div>
+    <div class="goalrow"><div class="goal" id="goal"></div><div class="sbtns"><button class="sbtn" id="sndBtn">声音 关</button><button class="sbtn" id="voBtn">朗读 关</button></div></div>
+  </div>
+  <div id="stage">
+    <canvas id="cv" aria-label="校园地图"></canvas>
+    <div id="toast"></div>
+    <div id="banner"></div>
+    <div class="ctlhint" id="ctlhint">拖动屏幕移动 · 键盘用方向键</div>
+    <div id="pauseMsg" hidden>暂停中</div>
+    <div id="shade" hidden></div>
+    <div id="modal" hidden></div>
+  </div>
+</div>
+<div id="over" class="over" hidden></div>
+
+<style>
+.mode{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:20px 0 8px}.mode button{text-align:left;padding:14px;border:1.5px solid var(--rule);background:var(--sheet);border-radius:5px}.mode button[aria-pressed="true"]{border-color:var(--red);box-shadow:2px 2px 0 var(--red)}.mode b{display:block;font-size:18px}.mode span{font-size:12px;color:var(--muted)}
+.real-note{font-size:12px;color:var(--muted);line-height:1.7}.source-link{overflow-wrap:anywhere}.card{min-height:48px}.card[disabled]{opacity:1;border-color:var(--ink);box-shadow:3px 3px 0 var(--ink);transform:none}.card:focus-visible{outline:1px dashed var(--blue);outline-offset:4px}.card:hover{transform:none;box-shadow:3px 3px 0 var(--ink)}.over .realbox .real-note{color:inherit;opacity:.7}.speak{min-height:30px}
+.bar.energy i{background:#9ac5ad}.bar.pressure i{background:#e9c46a}.bar.danger i{background:#ef7665}.meter-rule{font-size:10px;opacity:.78}.over .deltas span{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.25)}.over .deltas .ok{color:#9ac5ad}.over .deltas .bad{color:#ff8a7e}.over.win .deltas span{background:var(--paper);border-color:var(--rule)}
+@media(max-width:430px){.sheet{padding:15px 14px}.narr{font-size:16px}.mode button{padding:10px}}
+</style><script>
+'use strict';
+const SRC={
+ insult:{t:'教育部 · 师德警示教育（二）',date:'2021-05-11',u:'https://www.moe.gov.cn/jyb_xwfb/moe_2082/2021/2021_zl37/jiaoyujingshi/202105/t20210511_530820.html'},
+ gift:{t:'教育部 · 依兰县高级中学案件通报',date:'2014-09-24',u:'https://www.moe.gov.cn/jyb_xxgk/s5743/s5972/201409/t20140924_175372.html'},
+ hit:{t:'教育部 · 第十批典型案例',date:'2022-08-30',u:'https://www.moe.gov.cn/jyb_xwfb/gzdt_gzdt/s5987/202208/t20220830_656569.html'},
+ tuition:{t:'教育部 · 第九批典型案例',date:'2022-04-11',u:'https://fx.xwapp.moe.gov.cn/article/202204/62538d481916aa00012ea3b0.html'},
+ private:{t:'教育部 · 第八批典型案例',date:'2021-11-30',u:'https://www.moe.gov.cn/jyb_xwfb/gzdt_gzdt/s5987/202111/t20211130_583351.html'},
+ grade:{t:'教育部 · 第十一批典型案例',date:'2022-12-28',u:'https://www.moe.gov.cn/jyb_xwfb/gzdt_gzdt/s5987/202212/t20221228_1036899.html'}
+};
+// 第二人称场景和选择后果均为创作。real/res 只概述公开通报。
+const choice=(l,r)=>({l,r});
+const CASES=[
+ {id:'insult',tag:'C',ti:'家里挣多少钱',tx:'课堂上，老师拿你的家庭条件说事，暗示家里收入低，所以你也“不行”。全班安静下来，你攥着笔。',school:'both',real:'教育部2021年5月发布的警示案例记载：2021年2月，某中学教师肖某某在课堂上通过家长收入质疑家长素质，并歧视、侮辱学生。',res:'通报记载，涉事教师被降低岗位等级、调离岗位并撤销教师资格，学校主要负责人被问责。',src:'insult',ch:[choice('先不争辩，下课把经过告诉信任的成年人','你先让自己离开难堪的场面。有人愿意听你把事情说完。'),choice('说“我愿意讨论学习，请不要评价我的家庭”','你把边界说了出来，声音有点抖。老师的反应不会因为一句话就自动改变。'),choice('低下头，等这节课过去','你把委屈咽了回去。暂时沉默是当下的选择，你仍然可以之后寻求帮助。')]},
+ {id:'gift',tag:'M',ti:'教师节的礼物',school:'senior',tx:'教师节前后，有老师责怪班里没有送礼。有人开始收钱买东西，你也被问：“大家都交了，你交不交？”',real:'教育部2014年9月通报：依兰县高级中学高二一名班主任因学生未送教师节礼物，长时间训斥、谩骂学生；随后学生凑钱购买礼物。',res:'通报记载，涉事班主任被撤销教师资格、清除出教师队伍；违规礼物被退还或折合钱款退回。',src:'gift',ch:[choice('先不交钱，放学后把情况告诉家长','你没有当场和全班争执。把情况带回家，也是在为自己争取支持。'),choice('跟着交钱，想赶紧结束这件事','事情暂时过去了，但那种被迫的感觉没有跟着消失。'),choice('和同学商量，用一张自愿写的感谢卡表达心意','你们尝试把感谢和交钱分开。是否被接受，仍取决于老师和学校。')]},
+ {id:'hit',tag:'C',ti:'“为你好”的手',school:'both',tx:'老师因课堂上的事对你动手。旁边的同学都不说话。你脑子里闪过一句：“是不是只能忍着？”',real:'教育部2022年8月通报：云南省鲁甸县第二中学教师马某于2022年5月在课堂上体罚学生。',res:'通报记载，马某被降低岗位等级并调离教师岗位，学校及当地教育部门也受到相应处理。',src:'hit',ch:[choice('先离开冲突，去医务室，并联系信任的成年人','你把身体安全放在前面。受到伤害不是你的错，你不用独自解释这一切。'),choice('当场说“请不要打我”，请同学陪你离开','说出口很难。你请身边的人陪着，先结束眼前的冲突。'),choice('僵在原地，等老师停下来','你一时没能动起来。这是人在压力下可能出现的反应，不代表你接受伤害。')]},
+ {id:'tuition',tag:'F',ti:'补课名单',school:'both',tx:'放学前，任课老师推荐自己参与的校外收费补课。你还没想好，报名表已经传到了桌上。',real:'教育部2022年4月通报：2021年7月，金华市湖海塘中学教师李某及金华市第四中学两名教师参与校外违规有偿补课。',res:'通报记载，相关教师被通报批评、认定年度考核不合格并调离原岗位；其中两人受到警告处分。',src:'tuition',ch:[choice('说需要回家商量，先记下费用和课程信息','你给自己留出了考虑的空间，决定和家长一起看清这件事。'),choice('先答应，怕不报名以后被针对','你选择先缓和眼前的压力，心里却多了一件担心的事。'),choice('和同学一起问：不报名会不会影响正常上课？','你们问出了共同的疑惑，准备课后继续向可信的人确认。')]},
+ {id:'private',tag:'B',ti:'被叫去问话',school:'both',tx:'你和一位同学走得近，被老师叫到办公室。谈话从学习变成了指责，声音越来越大。你想让一个可信的人在场。',real:'教育部2021年11月通报：贵州省余庆县龙溪中学5名教师在2020年11月教育相关学生时方法简单粗暴、惩戒过当，构成体罚问题。',res:'通报记载，相关行为违反中小学教师职业行为准则，并受到处理。通报中的真实事件与这里虚构的问话场景并不完全相同。',src:'private',ch:[choice('请求另一位可信的老师在场，再继续谈','你提出了需要有人陪同。即使请求暂时没有被接受，也可以之后告诉家长。'),choice('只回答学习相关的问题，之后把经过记下来','你努力守住自己的界限，准备在安静一点的时候把事情讲给别人听。'),choice('不停道歉，希望快点结束','你想先离开这个房间。你没有义务独自承担大人的情绪。')]},
+ {id:'grade',tag:'M',ti:'分数降了',school:'both',tx:'这次考试成绩退步了。老师批评的不是错题，而是你“没救了”，还说要用惩罚让你记住。你昨天已经改题到很晚。',real:'教育部2022年12月通报：银川市北塔中学教师张某于2021年12月因学生作业完成不理想、成绩下滑，对部分学生进行不当惩戒。',res:'通报记载，张某被扣除相关绩效，三年内不得评优评先，并被要求公开检查、向全班学生和家长公开道歉。',src:'grade',ch:[choice('提出讨论错题，并请家长协助沟通惩罚问题','你愿意改进学习，也想让谈话回到具体问题上。'),choice('保证下次一定考好，先撑过这次谈话','你说出了一个连自己都不敢确定的保证。今晚的压力又重了一点。'),choice('先沉默，下课找朋友坐一会儿','你需要先缓过来。朋友陪你一起整理了还没说出口的话。')]}
+];
+const SC=(id,tag,ti,tx,ch,school='both')=>({id,tag,ti,tx,ch,school});
+const SCENES=[
+ SC('homework','M','作业没写完','昨晚你写到很晚，最后两道题还是空着。老师让你站起来解释。',[choice('如实说明卡在哪里，提出补做安排','你把“不会”和“没做”说明白了，希望能讨论下一步。'),choice('借同学的作业抄完','空白填满了，没弄懂的地方还在那里。'),choice('先认下批评，下课找同学讲题','你先度过这几分钟，课后终于听懂了其中一道。')]),
+ SC('latework','M','红笔旁边的批注','作业本上写着“态度有问题”。你其实只是没理解题目。',[choice('课后问老师具体哪一步需要改','老师指出了一处错误，这次谈话有了具体内容。'),choice('把本子塞进书包，不想看了','你暂时避开了红笔，却把疑问也一起收起来了。'),choice('先找同学核对，再把问题写下来','你给自己的困惑找到了一个更清楚的说法。')]),
+ SC('toilet','C','想去厕所','上课时你真的想去厕所。老师说：“刚才课间干什么去了？”',[choice('再说明一次身体需要，请求现在离开','你努力把需要说清楚，心里仍紧张。'),choice('一直忍到下课','时间显得特别长。身体的需要没有因为批评就消失。'),choice('若感觉明显不适，请求去医务室并让同学陪同','你认真对待身体的不适，找人一起去。')]),
+ SC('answer','C','答错的那一秒','老师点你回答问题。你答错了，后排有人笑，老师也说了句挖苦的话。',[choice('请老师说明正确思路','你试着把这一刻拉回题目。'),choice('笑一下坐下，假装没事','你在别人面前笑了，心里却不太好受。'),choice('下课找朋友说：刚才那句话让我很难受','有人听见了你的感受。一次答错不等于你很差。')]),
+ SC('phone','B','书包里的手机','老师发现你把手机带到了学校。你想说明它是用来放学联系家人的。',[choice('说明用途，问清保管和领回的安排','你尝试让事情有一个明确的结束时间。'),choice('当场大声争抢','争执变大了，手机的事情反而更难说清。'),choice('先停止争执，请家长协助沟通','你把眼前的冲突放下，准备之后一起确认安排。')]),
+ SC('hair','B','头发也要检查','年级在检查发型。老师说你的头发“看着不顺眼”，让你立刻剪短。',[choice('询问具体要求，提出回家沟通后再处理','你希望规则可以说清楚，也想留一点准备时间。'),choice('立刻答应，心里非常不情愿','你选择先减少冲突，却很难对着镜子释怀。'),choice('如果有人要强行动手，先离开并联系可信的成年人','你优先保护自己，让别人知道现场发生了什么。')]),
+ SC('food','L','午餐还没吃完','午饭刚吃到一半，老师催大家回教室订正试卷。你肚子还是空的。',[choice('说明还没吃完，请求吃完再回去','你争取到一点把饭吃完的时间。'),choice('放下饭盒赶回去','你赶上了订正，下午却有点发虚。'),choice('和同学一起说明大家需要用餐时间','一起开口没有那么孤单。')]),
+ SC('allergy','L','今天的菜不合适','你告诉值班老师，今天有一道菜你不能吃。老师以为你在挑食。',[choice('说明身体原因，请求换一份合适的食物','你把需要讲得更具体，找到了一份能吃的午饭。'),choice('只吃米饭，不再解释','你避免了争论，吃得却不太够。'),choice('请老师联系家长确认','你找了一个了解情况的人帮忙说明。')]),
+ SC('nap','N','午休不能动','你怎么也睡不着，轻轻抬了一下头。巡班老师说要记你的名字。',[choice('小声说明睡不着，但会保持安静','你试着争取一种安静休息的方式。'),choice('趴回去一直绷着不动','午休结束了，你的肩膀反而更酸。'),choice('等午休结束，找可信的老师聊最近的睡眠','你把持续的疲惫说了出来。')]),
+ SC('sick','N','头晕不是借口','你午休时头晕，想去医务室。老师说你是不是想逃下午的课。',[choice('说明具体不适，请同学陪着再提出一次','有人知道了你哪里不舒服，愿意陪你去。'),choice('硬撑着坐回去','你坐下了，但不适并没有过去。'),choice('请老师联系家长说明身体情况','你让照顾你的成年人知道了这件事。')]),
+ SC('clean','K','又是你值日','你这周已经多扫了一次，老师又让你留下替别人值日。',[choice('拿出值日表，说明这周的安排','你尝试让分工回到写下来的规则。'),choice('不解释，留下来扫完','地面干净了，你回家的时间又晚了一点。'),choice('先和同组同学一起核对，再沟通分工','有人记得你上次确实已经扫过。')]),
+ SC('trash','K','少了一个人','打扫时有人先走了。老师让整个小组一起受批评，大家都看向你。',[choice('如实说清分工，不替别人编理由','你把事实讲清楚，也没有添上猜测。'),choice('替全组认下来','批评结束得快，委屈却留在你这里。'),choice('和组员一起说明已经完成的工作','你们把各自做过的部分一项项说清。')]),
+ SC('exam','T','今晚再加一张卷子','今天课程结束前，老师又发了一张卷子。你的计划表已经排满了。',[choice('按轻重缓急安排，给睡觉留出时间','你不能让所有事情同时完成，但给身体留了一点余地。'),choice('决定熬夜把一切做完','你想全部做完，想到今晚却已经开始累。'),choice('把困难告诉家长或老师，商量完成安排','你让别人看到了具体的任务量。')]),
+ SC('sport','T','体育课又变自习','老师说要占用这节体育课讲卷子。你本来盼着出去跑两圈。',[choice('请班委代大家问能否保留运动时间','你们试着把共同的需要表达出来。'),choice('埋头继续写题','又一节课过去，眼睛更酸了。'),choice('课间先活动一下，之后再反馈','你先给自己找了一点伸展身体的时间。')]),
+ SC('parent','F','“叫你家长来”','放学前，老师说要让家长来一趟，却没有说明具体发生了什么。',[choice('问清事情经过，回家如实说明','你把不确定的担心变成了可以沟通的事情。'),choice('一路想着回家一定会挨骂','还没回家，最坏的情景已经在脑中演了一遍。'),choice('先找信任的老师帮你确认谈话内容','有人帮你把模糊的通知问清楚。')]),
+ SC('thanks','F','一张小纸条','一位老师把你的错题思路写在纸条上，说：“这一步进步了，慢慢来。”',[choice('把纸条夹进书里','今天终于有一句话，你愿意带回家。'),choice('谢谢老师，再问一个没懂的地方','你多问了一句，也多懂了一点。'),choice('放学后把这件事告诉朋友','你把今天的小好事分享了出去。')]),
+ SC('morning','M','早读音量','你嗓子有点疼，早读声音很小。老师说你偷懒。',[choice('说明嗓子不舒服，请求轻声读','你尝试用身体能承受的方式完成早读。'),choice('强撑着大声读','声音变大了，嗓子也更疼了。'),choice('请求先去医务室确认','你把身体的不舒服当成一件值得处理的事。')]),
+ SC('friend','B','朋友坐过来了','课间，一个同学坐在你旁边：“刚才那事，我看见了。你还好吗？”',[choice('说出刚才的感受','你不用把每个字都组织好，也有人认真听。'),choice('先喝口水，和他安静坐一会儿','没有急着解释的这几分钟，也很有用。'),choice('说现在还不想聊，约放学再说','朋友点点头。你可以自己选择开口的时间。')]),
+ SC('public','C','全班念成绩','老师让大家轮流念出成绩。念到你时，教室里有几声议论。',[choice('念完之后，把注意力放回错题','你努力把分数和自己的价值分开。'),choice('盯着试卷，不敢抬头','这几分钟让你很难受。一次成绩没有定义你。'),choice('课后提出希望以后单独反馈成绩','你说出了自己更能接受的反馈方式。')]),
+ SC('follow','C','最后一排','你看不清黑板，想换个位置。老师说成绩先上去再说。',[choice('明确说明看不清，请求先解决看课问题','你把“能看清”当成学习需要，继续说明。'),choice('勉强眯眼，照着别人笔记抄','你抄了很多，理解却没跟上。'),choice('请家长协助沟通视力和座位','有大人一起帮你把具体情况说清。')])
+];
+// 事件风险与数值均为游戏设定；每个选项同时影响精力和压力。
+const RISKS={
+ insult:[.18,1,.05],gift:[1,.04,.42],hit:[.18,1,.04],tuition:[.12,.04,1],private:[1,.28,.06],grade:[1,.06,.18],
+ homework:[.15,.4,.05],latework:[.12,.04,.06],toilet:[.18,.03,.12],answer:[.18,.04,.1],phone:[.12,.6,.15],hair:[.25,.03,.12],
+ food:[.15,.02,.2],allergy:[.15,.04,.1],nap:[.12,.02,.08],sick:[.2,.03,.12],clean:[.2,.02,.15],trash:[.15,.03,.1],
+ exam:[.12,.03,.08],sport:[.22,.02,.05],parent:[.12,.03,.1],thanks:[0,0,0],morning:[.18,.04,.12],friend:[0,0,0],public:[.05,.02,.25],follow:[.2,.03,.1]
+};
+const SILENT={insult:2,gift:1,hit:2,tuition:1,private:2,grade:1,homework:2,latework:1,toilet:1,answer:1,phone:2,hair:1,food:1,allergy:1,nap:1,sick:1,clean:1,trash:1,exam:1,sport:1,parent:1,morning:1,public:1,follow:1};
+const FAILS={
+ insult:'老师说你在顶嘴，把你叫到了办公室。',gift:'你没交钱，被点名留下。',hit:'冲突没有停止，你被带到了办公室。',tuition:'你问了报名的事，老师要求你留下单独谈。',private:'谈话没有结束，老师让你继续留在办公室。',grade:'老师把你的解释当成了借口，要求你留下。',
+ homework:'老师让你留下补完作业。',latework:'老师认为你在为作业找理由，要求你留下谈话。',toilet:'老师认为你影响课堂，把你叫到了办公室。',answer:'老师说你上课不认真，要求你课后留下。',phone:'手机的事情没有谈妥，你被要求留下。',hair:'发型检查没有通过，你被叫到了办公室。',food:'老师说你没有按时回教室，要求你留下。',allergy:'用餐的解释没有被接受，你被要求留下谈话。',nap:'午休时被记了名字，你被要求留下。',sick:'老师没有接受你的说明，要求你留下谈话。',clean:'值日的事没有说清，你被要求留下重做。',trash:'你的小组被留下重新打扫。',exam:'作业安排的事没谈妥，你被要求留下。',sport:'老师说你不服从安排，把你叫到了办公室。',parent:'老师让你留在学校等家长。',morning:'老师认为你没有认真早读，要求你留下。',public:'老师说你在课堂上顶嘴，把你叫到了办公室。',follow:'座位的事情没谈妥，你被要求留下。'
+};
+// 每组依次是 [精力变化, 压力变化]，对应该事件的三个选项。
+const EFFECTS={
+ insult:[[-4,-5],[-8,16],[-6,18]],gift:[[-4,5],[-4,14],[-6,7]],hit:[[-6,3],[-10,16],[-16,24]],
+ tuition:[[-2,-4],[-4,14],[-4,6]],private:[[-4,5],[-6,10],[-8,17]],grade:[[-4,4],[-8,16],[4,7]],
+ homework:[[-3,5],[-6,10],[-2,7]],latework:[[-3,-3],[-4,9],[-3,-4]],toilet:[[-3,5],[-14,12],[-2,3]],
+ answer:[[-3,3],[-5,12],[2,-6]],phone:[[-3,4],[-10,20],[-2,2]],hair:[[-4,6],[-4,14],[-5,4]],
+ food:[[14,3],[-16,12],[10,4]],allergy:[[12,-2],[-7,7],[10,2]],nap:[[12,3],[-5,10],[8,-4]],sick:[[10,2],[-18,16],[8,3]],
+ clean:[[-4,4],[-12,12],[-4,2]],trash:[[-4,5],[-6,16],[-3,2]],exam:[[8,-4],[-18,18],[4,-6]],
+ sport:[[-3,5],[-12,12],[10,-5]],parent:[[-2,3],[-8,17],[-2,-5]],thanks:[[8,-14],[5,-12],[6,-10]],
+ morning:[[-3,4],[-12,10],[6,-3]],friend:[[6,-14],[12,-10],[5,-8]],public:[[-3,5],[-6,14],[-3,7]],follow:[[-3,5],[-12,14],[-2,3]]
+};
+const ALL=CASES.concat(SCENES).map(c=>({...c,kind:c.real?'r':'s',ch:c.ch.map((x,i)=>({...x,p:RISKS[c.id][i],skip:SILENT[c.id]===i,z:FAILS[c.id]||'你被要求留下。',energyDelta:EFFECTS[c.id][i][0],stressDelta:EFFECTS[c.id][i][1]}))}));
+const R=Math.random,rint=(a,b)=>a+Math.floor(R()*(b-a+1)),clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),pick=a=>a[Math.floor(R()*a.length)];
+const fmt=t=>String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0');
+const $=id=>document.getElementById(id),esc=s=>String(s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+let S=null,mode='junior',autoPath=[],routeAuto=false,rafId=null;
+const AU=(()=>{
+  let ctx=null,master=null,music=null,sfx=null,timer=null,step=0,nextT=0,tempo=132,ducked=false,on=false;
+  try{on=localStorage.getItem('student_snd')==='1'}catch(e){}
+  const mf=m=>440*Math.pow(2,(m-69)/12);
+  // 原創 8 小節旋律（八分音符；0 = 休止）
+  const MEL=[72,76,79,76,74,72,74,76, 77,76,74,72,71,72,74,0, 72,76,79,81,79,77,76,74, 72,74,76,74,72,0,67,0,
+             69,72,76,72,74,77,76,74, 72,71,69,71,72,0,74,76, 77,79,81,79,77,76,74,72, 71,72,74,71,72,0,0,0];
+  const BASS=[48,45,41,43,45,41,43,48];
+  function init(){
+    if(!ctx){const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;ctx=new AC();
+      master=ctx.createGain();master.gain.value=on?1:0;master.connect(ctx.destination);
+      music=ctx.createGain();music.gain.value=.5;music.connect(master);sfx=ctx.createGain();sfx.gain.value=.9;sfx.connect(master)}
+    if(ctx.state==='suspended')ctx.resume();
+  }
+  function tone(f,t,d,type,vol,dest,att){const o=ctx.createOscillator(),g=ctx.createGain();o.type=type;o.frequency.value=f;
+    g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol,t+(att||.01));g.gain.exponentialRampToValueAtTime(.0001,t+d);
+    o.connect(g);g.connect(dest||sfx);o.start(t);o.stop(t+d+.05);return o}
+  function noise(t,d,vol,f1,f2,q){const len=Math.floor(ctx.sampleRate*d),b=ctx.createBuffer(1,len,ctx.sampleRate),a=b.getChannelData(0);for(let i=0;i<len;i++)a[i]=Math.random()*2-1;
+    const s=ctx.createBufferSource();s.buffer=b;const fl=ctx.createBiquadFilter();fl.type='bandpass';fl.Q.value=q||1;fl.frequency.setValueAtTime(f1,t);fl.frequency.exponentialRampToValueAtTime(f2,t+d);
+    const g=ctx.createGain();g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(.0001,t+d);s.connect(fl);fl.connect(g);g.connect(sfx);s.start(t);s.stop(t+d)}
+  function sched(){if(!ctx)return;const e=60/tempo/2;
+    while(nextT<ctx.currentTime+.15){const i=step%MEL.length,m=MEL[i];
+      if(m)tone(mf(m),nextT,e*.9,'square',.05,music);
+      if(i%2===0){const bm=BASS[Math.floor(i/8)%BASS.length]+(i%4===2?7:0);tone(mf(bm),nextT,e*1.8,'triangle',.12,music)}
+      if(i%4===2)noise(nextT,.05,.05,6000,8000,2);
+      nextT+=e;step++}}
+  function bgmStart(){if(!ctx)return;bgmStop();step=0;nextT=ctx.currentTime+.6;timer=setInterval(sched,30)}
+  function bgmStop(){if(timer){clearInterval(timer);timer=null}}
+  function setTempo(v){tempo=v}
+  function duck(v){if(!ctx||ducked===v)return;ducked=v;music.gain.setTargetAtTime(v?.18:.5,ctx.currentTime,.15)}
+  function bell(){if(!ctx)return;const N=[68,66,64,59, 64,68,66,59],t0=ctx.currentTime+.05;
+    N.forEach((m,i)=>{const t=t0+i*.5+(i>=4?.35:0),f=mf(m);tone(f,t,1.6,'sine',.18,sfx,.005);tone(f*2.01,t,.8,'sine',.05,sfx,.005);tone(f*3.02,t,.4,'sine',.025,sfx,.005)})}
+  function whoosh(){if(!ctx)return;noise(ctx.currentTime,.45,.35,400,2400,1.5)}
+  function stamp(){if(!ctx)return;const t=ctx.currentTime;noise(t,.12,.6,1200,300,.7);const o=tone(120,t,.35,'sine',.5);o.frequency.exponentialRampToValueAtTime(45,t+.3)}
+  function click(){if(!ctx)return;noise(ctx.currentTime,.06,.15,2500,1500,3)}
+  function doom(){if(!ctx)return;const t=ctx.currentTime+.1;tone(55,t,3.2,'sawtooth',.12,sfx,.3);tone(58.3,t,3.2,'sawtooth',.08,sfx,.3);tone(110,t+.05,1.2,'sine',.15)}
+  function fanfare(){if(!ctx)return;const t=ctx.currentTime+.05;[72,76,79,84].forEach((m,i)=>tone(mf(m),t+i*.13,i===3?.9:.25,'square',.08));tone(mf(60),t+.39,.9,'triangle',.15)}
+  function setOn(v){on=v;try{localStorage.setItem('student_snd',v?'1':'0')}catch(e){}if(master&&ctx)master.gain.setTargetAtTime(v?1:0,ctx.currentTime,.05)}
+  function pause(v){if(!ctx)return;v?ctx.suspend():ctx.resume()}
+  return {init,bgmStart,bgmStop,setTempo,duck,bell,whoosh,stamp,click,doom,fanfare,setOn,pause,get on(){return on}};
+})();
+const VO=(()=>{
+  const ok=typeof speechSynthesis!=='undefined'&&typeof SpeechSynthesisUtterance!=='undefined';
+  let voice=null,auto=false;
+  try{auto=localStorage.getItem('student_vo')==='1'}catch(e){}
+  function pickVoice(){if(!ok)return;const vs=speechSynthesis.getVoices();voice=vs.find(v=>/zh[-_]CN/i.test(v.lang))||vs.find(v=>/zh/i.test(v.lang))||null}
+  if(ok){pickVoice();try{speechSynthesis.addEventListener('voiceschanged',pickVoice)}catch(e){}}
+  function speak(text){if(!ok)return false;try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang=voice?voice.lang:'zh-CN';if(voice)u.voice=voice;u.rate=1.05;speechSynthesis.speak(u);return true}catch(e){return false}}
+  function stop(){if(ok)try{speechSynthesis.cancel()}catch(e){}}
+  function setAuto(v){auto=v;try{localStorage.setItem('student_vo',v?'1':'0')}catch(e){}if(!v)stop()}
+  return {ok,speak,stop,setAuto,get auto(){return auto}};
+})();
+function cardSpeech(c){return `${c.ti}。${c.tx}`+c.ch.map((x,i)=>`。${'ABCD'[i]}，${x.l}`).join('')}
+function syncAudioBtns(){const s=$('sndBtn'),v=$('voBtn');if(s)s.textContent=AU.on?'声音 开':'声音 关';if(v){v.hidden=!VO.ok;v.textContent=VO.auto?'朗读 开':'朗读 关'}}
+
+
+const TS=32,MW=38,MH=28,MPS=1.6;
+const ROOMS=[
+ {id:'cls7',loc:'cls',n:'本班教室',x:1,y:1,w:8,h:5,dx:5,dy:5,c:'#d4b07a',out:1},
+ {id:'cls8',loc:'cls',n:'另一间教室',x:10,y:1,w:7,h:5,dx:13,dy:5,c:'#d4b07a',out:1},
+ {id:'sci',loc:'sci',n:'实验室',x:18,y:1,w:7,h:5,dx:21,dy:5,c:'#9cc0b2',out:1},
+ {id:'nur',loc:null,n:'医务室',x:26,y:1,w:4,h:5,dx:27,dy:5,c:'#ece6da',out:1},
+ {id:'wc',loc:null,n:'厕所',x:31,y:1,w:2,h:5,dx:31,dy:5,c:'#b3cadb',out:1},
+ {id:'shop',loc:'shop',n:'小卖部',x:34,y:1,w:3,h:5,dx:35,dy:5,c:'#e8bb62',out:1},
+ {id:'off',loc:'off',n:'教师办公室',x:1,y:9,w:8,h:5,dx:4,dy:9,c:'#c1aad0',out:-1},
+ {id:'adm',loc:'adm',n:'年级办公室',x:10,y:9,w:7,h:5,dx:13,dy:9,c:'#a6b0cc',out:-1},
+ {id:'mtg',loc:null,n:'心理辅导室',x:1,y:16,w:8,h:5,dx:4,dy:16,c:'#9a7a6c',out:-1},
+ {id:'prin',loc:null,n:'校长室',x:10,y:16,w:7,h:5,dx:13,dy:16,c:'#86584b',out:-1},
+ {id:'gate',loc:'gate',n:'门卫室',x:11,y:23,w:3,h:2,dx:12,dy:23,c:'#a8a898',out:-1}
+];
+const TREES=[[2,23],[5,25],[8,23],[3,26],[7,26],[21,9],[36,9],[21,26],[36,26],[9,22]];
+const FIELD={x:24,y:12,w:10,h:10};
+let grid=[];
+function fillG(x,y,w,h,v){for(let j=y;j<y+h;j++)for(let i=x;i<x+w;i++)grid[j][i]=v}
+function buildWorld(){
+  grid=Array.from({length:MH},()=>Array(MW).fill(0));
+  for(let x=0;x<MW;x++){grid[0][x]=1;grid[MH-1][x]=1}
+  for(let y=0;y<MH;y++){grid[y][0]=1;grid[y][MW-1]=1}
+  fillG(21,9,16,18,2);fillG(1,22,9,5,2);
+  ROOMS.forEach(r=>{fillG(r.x,r.y,r.w,r.h,1);grid[r.dy][r.dx]=3});
+  TREES.forEach(([x,y])=>grid[y][x]=4);
+  grid[MH-1][18]=5;grid[MH-1][19]=5;
+}
+function walkable(x,y){const tx=Math.floor(x),ty=Math.floor(y);if(tx<0||ty<0||tx>=MW||ty>=MH)return false;const c=grid[ty][tx];if(c===5)return exitOpen();return c===0||c===2}
+function blocked(x,y,r){return !walkable(x-r,y-r)||!walkable(x+r,y-r)||!walkable(x-r,y+r)||!walkable(x+r,y+r)}
+function moveEnt(e,dx,dy,r){const ox=e.x,oy=e.y;if(!blocked(e.x+dx,e.y,r))e.x+=dx;if(!blocked(e.x,e.y+dy,r))e.y+=dy;return Math.hypot(e.x-ox,e.y-oy)}
+function randTile(near,rad){for(let k=0;k<60;k++){const x=near?clamp(Math.floor(near.x)+rint(-rad,rad),1,MW-2):rint(1,MW-2);const y=near?clamp(Math.floor(near.y)+rint(-rad,rad),1,MH-2):rint(1,MH-2);const c=grid[y][x];if(c===0||c===2)return {x:x+.5,y:y+.5}}return {x:19,y:7}}
+
+
+const PHASES=[
+ {n:'早读',t:450,end:479,dest:'cls7',k:2,tag:'M',lim:45},
+ {n:'上课',t:480,end:525,dest:'pick',k:2,tag:'C',lim:40},
+ {n:'课间',t:525,end:535,free:15,tag:'B'},
+ {n:'午餐',t:720,end:755,dest:'cls7',k:1,tag:'L',lim:40},
+ {n:'午休',t:760,end:800,dest:'cls7',k:1,tag:'N',lim:35},
+ {n:'下午课',t:810,end:855,dest:'pick',k:2,tag:'C',lim:40},
+ {n:'课间',t:855,end:865,free:15,tag:'B'},
+ {n:'值日',t:925,end:940,dest:'fld',k:1,tag:'K',lim:40},
+ {n:'自习',t:950,end:995,dest:'cls8',k:1,tag:'T',lim:40},
+ {n:'放学前',t:995,end:1020,dest:'gate',k:2,tag:'F',lim:40},
+ {n:'出校门',t:1020,end:1050,dest:'exit',k:0,tag:'Z',lim:50}
+];
+const LATE={...SC('late','C','铃响了','你还没走到教室，铃声已经响了。走廊值班老师叫住了你。',[
+ {...choice('说明正在赶过去，继续进教室','这次你赶到了教室。'),p:.15,z:'你迟到了，被值班老师要求留下。',energyDelta:-5,stressDelta:8},
+ {...choice('先停一下喘口气，再说明情况','老师让你先去上课。'),p:.3,z:'老师认为你在拖延，把你叫到了办公室。',energyDelta:3,stressDelta:5}]),kind:'s'};
+const NOTICE={id:'notice',kind:'s',ti:'批评通知',tx:'你被值班老师的批评通知叫住了。'};
+const exitOpen=()=>S&&S.ph===10;
+let P,NPCS,running=false,paused=false,userPaused=false,last=0,grace=0,keys={},joy=null,camX=0,camY=0,zoom=1,dpr=1,cvW=0,cvH=0,walkT=0,staticCv=null,toastT=null,bannerT=null,hintShown=0;
+const BAGS=['#d0453a','#2e6db4','#e0a526','#3a9a62','#8a4fb3'];
+const roomById=id=>ROOMS.find(r=>r.id===id);
+function newRun(day){S={day:day||1,t:450,used:new Set(),skips:[],energy:100,stress:10,lossCause:null,dead:false,won:false,ph:-1,phT:0,arrived:false,late:false,left:0,dest:null,paperT:18,doorCool:{},papers:[]};autoPath=[];routeAuto=false}
+function drawCard(tag){let pool=ALL.filter(c=>c.tag===tag&&!S.used.has(c.id)&&(c.school!=='senior'||mode==='senior'));if(!pool.length)pool=ALL.filter(c=>c.tag===tag&&(c.school!=='senior'||mode==='senior'));const real=pool.filter(c=>c.kind==='r'),daily=pool.filter(c=>c.kind==='s');return real.length&&(R()<.3||!daily.length)?pick(real):pick(daily)}
+function destName(){return S.dest==='fld'?'操场':S.dest==='exit'?'校门口':roomById(S.dest).n}
+function destPoint(){if(S.dest==='fld')return{x:29,y:17};if(S.dest==='exit')return{x:19,y:27.5};const r=roomById(S.dest);return{x:r.dx+.5,y:r.dy+.5}}
+function initWorld(){P={x:19,y:26.1,fx:0,fy:-1,moving:false};NPCS=[];for(let i=0;i<5;i++){const p=randTile(null);NPCS.push({type:'student',...p,spd:1.3+R()*.5,cool:0,bag:BAGS[i],tgt:null,stuck:0})}}
+function spawnParent(n,fast){for(let i=0;i<n;i++)NPCS.push({type:'parent',x:18.5+R(),y:26.4,spd:1.7,cool:0,life:18,tgt:null,stuck:0,detour:0})}
+function spawnPaper(){const src={x:P.x+(R()<.5?-6:6),y:P.y-4};S.papers.push({...src,vx:0,vy:0,wait:1.1,life:3,rot:0});toast('值班老师的批评通知来了，可以走开。')}
+function updNPC(n,dt){if(n.type==='parent'){n.life-=dt;if(n.life<=0){n.gone=true;return}}if(!n.tgt||Math.hypot(n.tgt.x-n.x,n.tgt.y-n.y)<.3)n.tgt=randTile(n,6);const dx=n.tgt.x-n.x,dy=n.tgt.y-n.y,L=Math.hypot(dx,dy)||1,s=n.spd*dt,m=moveEnt(n,dx/L*s,dy/L*s,.28);n.walk=(n.walk||0)+m*3;n.fx=dx/L;n.fy=dy/L;if(m<s*.3){n.stuck+=dt;if(n.stuck>.5){n.tgt=randTile(n,4);n.stuck=0}}else n.stuck=0;if(n.cool>0)n.cool-=dt}
+function atDest(){if(S.dest==='fld')return P.x>FIELD.x&&P.x<FIELD.x+FIELD.w&&P.y>FIELD.y&&P.y<FIELD.y+FIELD.h;if(S.dest==='exit')return P.y>MH-1.15;const r=roomById(S.dest);return Math.hypot(P.x-r.dx-.5,P.y-r.dy-.5)<1.05}
+function startPhase(i){S.ph=i;const ph=PHASES[i];AU.bell();S.t=ph.t;S.phT=0;S.arrived=false;S.late=false;S.left=ph.k||0;S.papers=[];autoPath=[];S.dest=ph.free?null:(ph.dest==='pick'?pick(['cls8','sci','cls7']):ph.dest);if(ph.free)spawnParent(1);banner(`${fmt(ph.t)}　${ph.n}`,ph.free?'喝口水，活动一下。':`去 ${destName()}`);hud();if(routeAuto&&S.dest)planRoute(false)}
+function nextPhase(){if(S.ph+1>=PHASES.length)return renderWin();startPhase(S.ph+1)}
+function arrive(){S.arrived=true;autoPath=[];if(S.dest==='exit')return renderWin();runCards()}
+function runCards(){const ph=PHASES[S.ph];if(S.left<=0){nextPhase();return}S.left--;openCase(drawCard(ph.tag),`${ph.n} · ${destName()}`,runCards)}
+function phaseLimit(){const ph=PHASES[S.ph];return ph.free||ph.lim}
+function update(dt){let ix=0,iy=0;if(keys.ArrowLeft||keys.a)ix--;if(keys.ArrowRight||keys.d)ix++;if(keys.ArrowUp||keys.w)iy--;if(keys.ArrowDown||keys.s)iy++;if(joy){const jx=(joy.x-joy.ox)/42,jy=(joy.y-joy.oy)/42,L=Math.hypot(jx,jy);if(L>.15){ix=jx/Math.max(1,L);iy=jy/Math.max(1,L)}}const L=Math.hypot(ix,iy);P.moving=L>.1||autoPath.length>0;if(L>.1){const nx=ix/Math.max(1,L),ny=iy/Math.max(1,L);P.fx=nx;P.fy=ny;walkT+=moveEnt(P,nx*4.3*dt,ny*4.3*dt,.3);if(!hintShown){hintShown=1;$('ctlhint').style.opacity=0}}
+ NPCS.forEach(n=>updNPC(n,dt));NPCS=NPCS.filter(n=>!n.gone);const ph=PHASES[S.ph];S.phT+=dt;const nt=Math.min(ph.end,ph.t+Math.floor(S.phT/phaseLimit()*(ph.end-ph.t)));if(nt!==S.t){S.t=nt;hud()}
+ S.paperT-=dt;if(S.paperT<=0){S.paperT=rint(24,36);spawnPaper()}for(let i=S.papers.length-1;i>=0;i--){const p=S.papers[i];if(p.wait>0){p.wait-=dt;if(p.wait<=0){const dx=P.x-p.x,dy=P.y-p.y,L=Math.hypot(dx,dy)||1;p.vx=dx/L*5;p.vy=dy/L*5}continue}p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt;p.rot+=dt*8;if(Math.hypot(p.x-P.x,p.y-P.y)<.55){S.papers.splice(i,1);return renderLose(NOTICE,'路上的批评通知','你被值班老师叫住，要求到办公室说明情况。')}else if(p.life<=0||p.x<0||p.y<0||p.x>MW||p.y>MH)S.papers.splice(i,1)}
+ grace-=dt;if(grace>0)return;if(ph.free&&S.phT>=ph.free)return nextPhase();for(const n of NPCS){if(n.cool>0)continue;if(Math.hypot(n.x-P.x,n.y-P.y)<.65){n.cool=22;return openCase(drawCard('B'),n.type==='parent'?'走廊 · 值班老师':'走廊 · 同学',()=>{})}}
+ if(ph.free)return;if(!S.arrived&&atDest())return arrive();if(!S.arrived&&!S.late&&S.phT>=ph.lim&&S.dest!=='exit'){S.late=true;openCase(LATE,'还在路上',()=>{const d=destPoint(),r=roomById(S.dest);P.x=d.x;P.y=d.y+(r?r.out:0);arrive()})}}
+function planRoute(enable=true){if(!S||paused)return;if(enable)routeAuto=true;if(!S.dest){toast('现在是课间，可以自由活动。');return}const d=destPoint(),r=roomById(S.dest),gx=Math.floor(d.x),gy=Math.floor(d.y)+(r?r.out:0),sx=Math.floor(P.x),sy=Math.floor(P.y);const q=[[sx,sy]],prev=new Map([[`${sx},${sy}`,null]]);for(let i=0;i<q.length;i++){const[x,y]=q[i];if(x===gx&&y===gy)break;for(const[dx,dy]of[[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,ny=y+dy,k=`${nx},${ny}`;if(!prev.has(k)&&walkable(nx+.5,ny+.5)){prev.set(k,[x,y]);q.push([nx,ny])}}}if(!prev.has(`${gx},${gy}`)){toast('这条路暂时走不通，请用方向键绕一下。');return}const rev=[];let at=[gx,gy];while(at){rev.push({x:at[0]+.5,y:at[1]+.5});at=prev.get(at.join(','))}autoPath=rev.reverse();toast('沿走廊带你过去；拖动或按方向键可接管。')}
+function followRoute(dt){if(!autoPath.length)return;const d=autoPath[0],dx=d.x-P.x,dy=d.y-P.y,L=Math.hypot(dx,dy);if(L<.08){autoPath.shift();return}const step=Math.min(4.3*dt,L);P.fx=dx/L;P.fy=dy/L;walkT+=moveEnt(P,dx/L*step,dy/L*step,.3)}
+function toast(m){$('toast').textContent=m;$('toast').classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>$('toast').classList.remove('on'),2400)}
+function banner(a,b){$('banner').innerHTML=`<b>${esc(a)}</b><span>${esc(b)}</span>`;$('banner').classList.add('on');clearTimeout(bannerT);bannerT=setTimeout(()=>$('banner').classList.remove('on'),1900)}
+function sourceLink(c){const s=SRC[c.src];return `<a class="source-link" href="${s.u}" target="_blank" rel="noopener noreferrer">${esc(s.t)} · ${s.date} ↗</a>`}
+function renderStart(){
+ running=false;if(rafId)cancelAnimationFrame(rafId);rafId=null;paused=false;userPaused=false;AU.bgmStop();VO.stop();$('game').hidden=true;$('over').hidden=true;$('over').innerHTML='';$('startWrap').hidden=false;
+ $('main').innerHTML=`<section class="hero">
+  <h1 class="title">今天也要<br><em>平安</em>放学</h1>
+  <p class="tag">被留下、压力到 100、精力降到 0，都会淘汰。</p>
+  <p class="lede">你是一个普通的中国中学生。<br>游戏中的事件改编自初高中公开案例和校园日常情境。<b>淘汰后</b>，再看背后的案例。</p>
+  <div class="mode" aria-label="选择学生身份"><button data-mode="junior" aria-pressed="${mode==='junior'}"><b>初三学生</b></button><button data-mode="senior" aria-pressed="${mode==='senior'}"><b>高三学生</b></button></div>
+  <p class="flowline">早读 → 上课 → 课间 → 午餐 → 午休 → 下午课 → 课间 → 值日 → 自习 → 放学前 → 出校门</p>
+  <button class="primary big-btn" id="go">07:30 进校门</button>
+  <p class="best">拖动屏幕移动，跟着指示走到下一个地点。<br>每个选项都会改变精力和压力，选择后显示变化。</p>
+ </section>`;
+ $('go').onclick=()=>{newRun(1);startGame()};
+ document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{mode=b.dataset.mode;document.querySelectorAll('[data-mode]').forEach(el=>el.setAttribute('aria-pressed',String(el.dataset.mode===mode)))});
+ scrollTo(0,0);
+}
+function startGame(){
+ $('startWrap').hidden=true;$('over').hidden=true;$('over').innerHTML='';$('game').hidden=false;$('modal').hidden=true;$('shade').hidden=true;$('pauseMsg').hidden=true;$('pauseBtn').textContent='暂停';$('pauseBtn').setAttribute('aria-label','暂停');
+ keys={};joy=null;hintShown=0;$('ctlhint').style.opacity=1;AU.init();AU.bgmStart();syncAudioBtns();initWorld();paused=false;userPaused=false;grace=.5;resize();startPhase(0);
+ if(!running){running=true;last=performance.now();rafId=requestAnimationFrame(frame)}
+}
+function hud(){
+ if(!S||S.ph<0)return;const ph=PHASES[S.ph];$('clock').textContent=fmt(S.t);$('who').textContent=`${mode==='junior'?'初三':'高三'}学生 · 第 ${S.day} 天 · ${ph.n}`;$('skips').textContent=S.skips.length;
+ $('energyBar').style.width=S.energy+'%';$('energyNum').textContent=S.energy+'/100';$('energyMeter').setAttribute('aria-valuenow',S.energy);$('energyMeter').classList.toggle('danger',S.energy<=20);
+ $('stressBar').style.width=S.stress+'%';$('stressNum').textContent=S.stress+'/100';$('stressMeter').setAttribute('aria-valuenow',S.stress);$('stressMeter').classList.toggle('danger',S.stress>=75);
+ $('goal').textContent=ph.free?'课间：自由走动，铃响前小心被叫住。':(S.arrived?`${ph.n}中`:`目标：走到 ${destName()}`);
+ $('flow').innerHTML=PHASES.map((p,i)=>`<span class="${i<S.ph?'done':i===S.ph?'now':''}">${p.n}</span>`).join('');const cur=$('flow').querySelector('.now');if(cur)cur.scrollIntoView({block:'nearest',inline:'center'});
+}
+function openCase(c,locName,after){
+ if(!c){after&&after();return}if(S.dead||S.won)return;if(c.id!=='late')S.used.add(c.id);paused=true;joy=null;keys={};hud();const m=$('modal');
+ // 选项打乱显示，游戏没有标出的正确答案。
+ const options=c.ch.slice();for(let i=options.length-1;i>0;i--){const j=Math.floor(R()*(i+1));[options[i],options[j]]=[options[j],options[i]]}
+ m.innerHTML=`<section class="sheet fade-in"><div class="sheet-head"><span>${fmt(S.t)} · ${esc(locName)}</span>${VO.ok?'<button class="speak" id="speakBtn">朗读</button>':''}</div><h2>${esc(c.ti)}</h2><p class="narr">${esc(c.tx)}</p><div class="choices">${options.map((x,i)=>`<button class="card" data-i="${i}"><span class="k">${'ABCD'[i]}</span><span class="t">${esc(x.l)}</span></button>`).join('')}</div><div id="res" aria-live="polite"></div></section>`;
+ $('shade').hidden=false;m.hidden=false;m.scrollTop=0;m.querySelectorAll('.card').forEach(b=>b.onclick=()=>choose(c,options[+b.dataset.i],b,after));AU.duck(true);AU.click();
+ if($('speakBtn'))$('speakBtn').onclick=()=>VO.speak(cardSpeech({...c,ch:options}));if(VO.auto)VO.speak(cardSpeech({...c,ch:options}));
+}
+function effectLabels(change){
+ const number=n=>n>0?'+'+n:String(n);return `<div class="deltas"><span class="${change.energy>0?'ok':change.energy<0?'bad':''}">精力 ${number(change.energy)}</span><span class="${change.stress<0?'ok':change.stress>0?'bad':''}">压力 ${number(change.stress)}</span></div>`;
+}
+function meterLoss(){return S.energy<=0&&S.stress>=100?'both':S.energy<=0?'energy':S.stress>=100?'stress':null}
+function choose(c,x,btn,after){
+ if(btn.disabled||S.dead||S.won)return;document.querySelectorAll('#modal .card').forEach(b=>b.disabled=true);btn.blur();VO.stop();
+ const before={energy:S.energy,stress:S.stress};S.energy=clamp(S.energy+x.energyDelta,0,100);S.stress=clamp(S.stress+x.stressDelta,0,100);const change={energy:S.energy-before.energy,stress:S.stress-before.stress};hud();
+ const cause=meterLoss();if(cause)return renderLose(c,`${PHASES[S.ph].n} · ${x.l}`,cause==='both'?'精力已经耗尽，压力也到了极限。':cause==='energy'?'精力已经降到 0，今天先到这里。':'压力已经达到 100，今天先到这里。',cause,change);
+ const eliminated=!!x.rep||(x.p!=null&&R()<x.p);
+ if(eliminated)return renderLose(c,`${PHASES[S.ph].n} · ${x.l}`,x.z,'event',change);
+ if(x.skip)S.skips.push(c.ti);
+ hud();$('res').innerHTML=`<div class="result fade-in"><p class="narr">${esc(x.r||'这次你没有被留下。')}</p>${effectLabels(change)}<button class="go" id="next">继续</button></div>`;
+ $('next').onclick=()=>{VO.stop();AU.duck(false);$('modal').hidden=true;$('shade').hidden=true;paused=userPaused;grace=1.2;hud();after&&after()};$('res').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function renderLose(c,what,reason,cause='event',change=null){
+ if(S.dead||S.won)return;running=false;if(rafId)cancelAnimationFrame(rafId);rafId=null;S.dead=true;S.lossCause=cause;paused=true;autoPath=[];keys={};joy=null;AU.bgmStop();AU.duck(false);AU.doom();VO.stop();
+ $('game').hidden=true;$('modal').hidden=true;$('shade').hidden=true;const o=$('over');o.className='over';o.hidden=false;
+ const title=cause==='energy'?'精力耗尽':cause==='stress'?'压力爆表':cause==='both'?'撑不住了':'被留下了';
+ o.innerHTML=`<div class="wrap"><div class="eyebrow" style="color:#ff8a7e">${mode==='junior'?'初三':'高三'}学生 · ${fmt(S.t)} · ${esc(what)}</div><h1 class="big">${title}</h1><p class="nth">这一天，你没能平安放学。</p><p class="reason">${esc(reason||'老师让你到办公室说明情况。')}</p><div class="idx"><div>剩余精力<b>${S.energy}/100</b></div><div>当前压力<b>${S.stress}/100</b></div></div>${change?effectLabels(change):''}<div class="row"><button class="primary" id="again">再来一次</button><button class="ghost" id="home">返回首页</button></div>
+  ${c.real?`<div class="realbox"><div class="realtag">真实事件</div>${VO.ok?'<button class="speak" id="speakReal">朗读</button>':''}<p>${esc(c.real)}</p><p class="res">${esc(c.res)}</p><p class="src">出处：${sourceLink(c)}</p><p class="real-note">游戏中的对话、选择和淘汰结果为创作；以上摘要是公开通报记载的事实。</p></div>`:`<div class="realbox"><div class="realtag">虚构情境</div><p>${esc(c.tx)}</p><p class="res">这是为游戏编写的校园日常情境，没有对应的特定新闻案例。</p></div>`}
+  <div class="sect"><p class="hurt">受到伤害，不是学生的错。</p><p class="small">游戏的淘汰不代表你的选择在现实中是错的。</p></div></div>`;
+ $('again').onclick=()=>{newRun(S.day);startGame()};$('home').onclick=renderStart;const sr=$('speakReal');if(sr)sr.onclick=()=>VO.speak(c.real+c.res);if(VO.auto&&c.real)VO.speak(c.real+c.res);o.scrollTop=0;
+}
+function renderWin(){
+ if(S.dead||S.won)return;running=false;if(rafId)cancelAnimationFrame(rafId);rafId=null;S.won=true;paused=false;autoPath=[];AU.bgmStop();AU.fanfare();VO.stop();$('game').hidden=true;$('modal').hidden=true;$('shade').hidden=true;const o=$('over');o.className='over win';o.hidden=false;const k=S.skips.length;
+ o.innerHTML=`<div class="wrap"><div class="eyebrow">${mode==='junior'?'初三':'高三'}学生 · 第 ${S.day} 天 · ${fmt(S.t)} 出校门</div><h1 class="big">平安放学</h1><div class="idx"><div>剩余精力<b>${S.energy}/100</b></div><div>当前压力<b>${S.stress}/100</b></div></div><p class="nth">今天你有 <b>${k}</b> 件事选择忍下。</p>${k?`<ul class="skiplist">${S.skips.map(t=>`<li>${esc(t)}</li>`).join('')}</ul>`:''}<div class="row"><button class="primary" id="tomorrow">迎接第 ${S.day+1} 天</button><button class="ghost" id="again">重新开始</button></div></div>`;
+ $('tomorrow').onclick=()=>{newRun(S.day+1);startGame()};$('again').onclick=renderStart;o.scrollTop=0;
+}
+
+function setUserPause(v){userPaused=v;AU.pause(v);if(v)VO.stop();keys={};joy=null;if($('modal').hidden)paused=v;$('pauseMsg').hidden=!v;$('pauseBtn').textContent=v?'继续':'暂停';$('pauseBtn').setAttribute('aria-label',v?'继续':'暂停');hud()}
+/* 繪圖 */
+function resize(){const st=$('stage');if(!st)return;const r=st.getBoundingClientRect();dpr=Math.min(2,window.devicePixelRatio||1);
+  cvW=Math.max(1,r.width);cvH=Math.max(1,r.height);const cv=$('cv');cv.width=Math.round(cvW*dpr);cv.height=Math.round(cvH*dpr);
+  zoom=clamp(Math.min(cvW/(12*TS),cvH/(9*TS)),.75,1.6)}
+function hash(x,y){let h=x*374761393+y*668265263;h=(h^(h>>13))*1274126177;return ((h^(h>>16))>>>0)/4294967295}
+function buildStatic(){
+  const sc=2,c=document.createElement('canvas');c.width=MW*TS*sc;c.height=MH*TS*sc;const g=c.getContext('2d');g.scale(sc,sc);
+  for(let y=0;y<MH;y++)for(let x=0;x<MW;x++){const v=grid[y][x],px=x*TS,py=y*TS;
+    if(v===2||v===4){g.fillStyle=(x%2)?'#79a85a':'#82b163';g.fillRect(px,py,TS,TS)}
+    else{g.fillStyle='#d9d4c6';g.fillRect(px,py,TS,TS);for(let k=0;k<7;k++){const h=hash(x*7+k,y*13+k),h2=hash(y*5+k,x*11+k);g.fillStyle=h>.66?'#b8b1a1':h>.33?'#efe9dc':'#9f9686';g.fillRect(px+h*TS,py+h2*TS,2,2)}
+      g.strokeStyle='rgba(120,110,95,.18)';g.strokeRect(px+.5,py+.5,TS-1,TS-1)}}
+  g.save();g.beginPath();g.ellipse(28.5*TS,17.5*TS,6.6*TS,6.2*TS,0,0,Math.PI*2);g.lineWidth=TS*1.5;g.strokeStyle='#b85c3e';g.stroke();
+  g.lineWidth=1.5;g.strokeStyle='rgba(255,255,255,.8)';[-.4,0,.4].forEach(o=>{g.beginPath();g.ellipse(28.5*TS,17.5*TS,(6.6+o)*TS,(6.2+o)*TS,0,0,Math.PI*2);g.stroke()});
+  g.fillStyle='rgba(255,255,255,.28)';g.font='900 46px "Noto Serif SC",serif';g.textAlign='center';g.textBaseline='middle';g.fillText('操场',28.5*TS,17.5*TS);g.restore();
+  for(let y=0;y<MH;y++)for(let x=0;x<MW;x++){if(grid[y][x]===1&&(x===0||y===0||x===MW-1||y===MH-1)){g.fillStyle='#596a5c';g.fillRect(x*TS,y*TS,TS,TS);g.fillStyle='#6f8272';g.fillRect(x*TS,y*TS,TS,6)}}
+  [18,19].forEach(x=>{g.fillStyle='#c8c3b4';g.fillRect(x*TS,(MH-1)*TS,TS,TS)});
+  g.fillStyle='#3d4a40';g.fillRect(17*TS+20,(MH-1)*TS-6,12,TS+6);g.fillRect(20*TS,(MH-1)*TS-6,12,TS+6);
+  g.fillStyle='#f3f0e5';g.font='700 11px "Noto Sans SC",sans-serif';g.textAlign='center';g.fillText('校门',19*TS,(MH-1)*TS-10);
+  TREES.forEach(([x,y])=>{const cx=x*TS+TS/2,cy=y*TS+TS/2;g.fillStyle='rgba(0,0,0,.22)';g.beginPath();g.ellipse(cx+3,cy+10,13,6,0,0,7);g.fill();
+    g.fillStyle='#3f7a46';g.beginPath();g.arc(cx,cy,14,0,7);g.fill();g.fillStyle='#4f9455';g.beginPath();g.arc(cx-4,cy-4,9,0,7);g.fill()});
+  ROOMS.forEach(r=>{const x=r.x*TS,y=r.y*TS,w=r.w*TS,h=r.h*TS;
+    g.fillStyle='rgba(0,0,0,.25)';g.fillRect(x+4,y+6,w,h);g.fillStyle=r.c;g.fillRect(x,y,w,h);
+    g.strokeStyle='rgba(40,30,20,.55)';g.lineWidth=2;g.strokeRect(x+1,y+1,w-2,h-2);
+    g.strokeStyle='rgba(0,0,0,.08)';g.lineWidth=1;for(let yy=y+8;yy<y+h;yy+=8){g.beginPath();g.moveTo(x+2,yy);g.lineTo(x+w-2,yy);g.stroke()}
+    const wy=r.out>0?y+h-12:y+4;g.fillStyle='#bfe0ef';for(let xx=x+8;xx<x+w-14;xx+=22){if(Math.abs(xx+6-(r.dx*TS+TS/2))<18)continue;g.fillRect(xx,wy,12,8)}
+    const dx=r.dx*TS,dy=r.dy*TS;g.fillStyle='#7a4e2c';g.fillRect(dx+5,dy+(r.out>0?8:0),TS-10,TS-8);g.fillStyle='#e8c35a';g.fillRect(dx+TS-11,dy+16,3,3);
+    g.font='700 13px "Noto Sans SC",sans-serif';const tw=g.measureText(r.n).width,sx=x+w/2,sy=r.h>2?y+h/2:y+h-12,bw=Math.max(tw,28)+14;
+    g.fillStyle='rgba(251,252,248,.92)';g.fillRect(sx-bw/2,sy-11,bw,22);g.strokeStyle='#1d2725';g.lineWidth=1.5;g.strokeRect(sx-bw/2,sy-11,bw,22);
+    g.fillStyle='#1d2725';g.textAlign='center';g.textBaseline='middle';g.fillText(r.n,sx,sy)});
+  staticCv=c;
+}
+function drawPerson(g,x,y,o){
+  const bob=o.moving?Math.sin(o.walk*2.2)*1.6:0;
+  g.fillStyle='rgba(0,0,0,.25)';g.beginPath();g.ellipse(x,y+11,9,4,0,0,7);g.fill();
+  g.fillStyle=o.pants;const lp=o.moving?Math.sin(o.walk*2.2)*3:0;g.fillRect(x-5,y+3+bob,4,8+lp*.3);g.fillRect(x+1,y+3+bob,4,8-lp*.3);
+  g.fillStyle=o.shirt;g.fillRect(x-7,y-6+bob,14,11);
+  if(o.bag){g.fillStyle=o.bag;g.fillRect(x-8,y-5+bob,4,9)}
+  if(o.lanyard){g.strokeStyle='#c3352b';g.lineWidth=1.5;g.beginPath();g.moveTo(x-4,y-6+bob);g.lineTo(x,y+1+bob);g.lineTo(x+4,y-6+bob);g.stroke();g.fillStyle='#fff';g.fillRect(x-2,y+bob,4,4)}
+  g.fillStyle='#f0c9a2';g.beginPath();g.arc(x,y-12+bob,7,0,7);g.fill();
+  g.fillStyle=o.hair;g.beginPath();g.arc(x,y-14+bob,7,Math.PI,0);g.fill();
+  if(o.fy>=0){g.fillStyle='#222';g.fillRect(x-3+o.fx*2,y-12+bob,2,2);g.fillRect(x+2+o.fx*2,y-12+bob,2,2)}
+  if(o.label){g.font='700 10px "Noto Sans SC",sans-serif';g.textAlign='center';const tw=g.measureText(o.label).width+8;g.fillStyle=o.labelBg||'rgba(29,39,37,.85)';g.fillRect(x-tw/2,y-34+bob,tw,14);g.fillStyle='#fff';g.textBaseline='middle';g.fillText(o.label,x,y-27+bob)}
+  if(o.bang){g.fillStyle='#ffd23f';g.strokeStyle='#1d2725';g.lineWidth=1.5;g.beginPath();g.arc(x+11,y-24+bob,7,0,7);g.fill();g.stroke();g.fillStyle='#1d2725';g.font='900 11px sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText('!',x+11,y-23.5+bob)}
+}
+
+function draw(){
+  const cv=$('cv');if(!cv)return;const g=cv.getContext('2d');
+  g.setTransform(1,0,0,1,0,0);g.fillStyle='#33402f';g.fillRect(0,0,cv.width,cv.height);
+  if(!staticCv||!S||!P||S.ph<0)return;
+  const vw=cvW/zoom,vh=cvH/zoom,WW=MW*TS,WH=MH*TS;
+  let tx=P.x*TS-vw/2,ty=P.y*TS-vh/2;tx=vw>=WW?(WW-vw)/2:clamp(tx,0,WW-vw);ty=vh>=WH?(WH-vh)/2:clamp(ty,0,WH-vh);
+  camX+=(tx-camX)*.2;camY+=(ty-camY)*.2;if(Math.abs(tx-camX)>200)camX=tx;if(Math.abs(ty-camY)>200)camY=ty;
+  g.setTransform(dpr*zoom,0,0,dpr*zoom,-camX*dpr*zoom,-camY*dpr*zoom);
+  g.drawImage(staticCv,0,0,WW,WH);
+  const now=performance.now()/1000,pulse=.55+.45*Math.sin(now*5);
+  // 目的地
+  if(S.dest&&!S.arrived){
+    g.strokeStyle=`rgba(255,214,90,${pulse})`;g.lineWidth=4;
+    if(S.dest==='fld'){g.setLineDash([10,8]);g.strokeRect(FIELD.x*TS,FIELD.y*TS,FIELD.w*TS,FIELD.h*TS);g.setLineDash([])}
+    else if(S.dest!=='exit'){const r=roomById(S.dest);g.strokeRect(r.dx*TS+2,r.dy*TS+(r.out>0?4:-4),TS-4,TS);
+      g.fillStyle='#ffd23f';g.beginPath();const bx=r.dx*TS+TS/2,by=r.dy*TS+(r.out>0?TS+18:-16)+Math.sin(now*6)*3;g.moveTo(bx,by-(r.out>0?-10:10));g.lineTo(bx-8,by);g.lineTo(bx+8,by);g.closePath();g.fill()}}
+  // 课间時可進入的門
+  if(PHASES[S.ph].free)['off','adm'].forEach(id=>{const r=roomById(id);g.strokeStyle=`rgba(195,53,43,${pulse})`;g.lineWidth=2;g.strokeRect(r.dx*TS+3,r.dy*TS-2,TS-6,TS-4)});
+  if(exitOpen()){g.fillStyle=`rgba(255,214,90,${.45+.35*Math.sin(now*5)})`;g.fillRect(18*TS,(MH-1)*TS,2*TS,TS);
+    g.fillStyle='#1d2725';g.font='900 12px "Noto Sans SC",sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText('放学回家',19*TS,(MH-1)*TS+TS/2)}
+  else{g.strokeStyle='#3d4a40';g.lineWidth=3;for(let i=0;i<8;i++){const xx=18*TS+4+i*8;g.beginPath();g.moveTo(xx,(MH-1)*TS+2);g.lineTo(xx,MH*TS-2);g.stroke()}}
+  const ents=NPCS.map(n=>({n,y:n.y})).concat([{n:null,y:P.y}]).sort((a,b)=>a.y-b.y);
+  ents.forEach(e=>{
+    if(!e.n){drawPerson(g,P.x*TS,P.y*TS,{moving:P.moving,walk:walkT*2,shirt:'#f4f4f0',pants:'#2d2d33',hair:'#2a211c',bag:'#df8e40',fx:P.fx,fy:P.fy,label:'你',labelBg:'#c3352b'});return}
+    const n=e.n;
+    if(n.type==='student')drawPerson(g,n.x*TS,n.y*TS,{moving:1,walk:n.walk||0,shirt:'#f4f4f0',pants:'#24335c',hair:'#1b1b1b',bag:n.bag,fx:n.fx||0,fy:n.fy||1});
+    else drawPerson(g,n.x*TS,n.y*TS,{moving:1,walk:n.walk||0,shirt:'#7b4fa3',pants:'#3b3340',hair:'#3b2a20',fx:n.fx||0,fy:n.fy||1,label:'老师',labelBg:'#7b4fa3',bang:!n.cool&&n.life>0});
+  });
+  (S.papers||[]).forEach(p=>{const x=p.x*TS,y=p.y*TS-8;if(p.wait>0){g.strokeStyle='rgba(255,59,48,.9)';g.lineWidth=3;g.beginPath();g.arc(x,y,14+p.wait*30,0,7);g.stroke();g.strokeStyle='rgba(255,59,48,.35)';g.setLineDash([6,6]);g.beginPath();g.moveTo(x,y);g.lineTo(P.x*TS,P.y*TS-8);g.stroke();g.setLineDash([])}g.save();g.translate(x,y);g.rotate(p.rot);g.fillStyle='#fffdf5';g.strokeStyle='#1d2725';g.lineWidth=1.2;g.fillRect(-9,-11,18,22);g.strokeRect(-9,-11,18,22);
+    g.fillStyle='#c3352b';g.fillRect(-6,-7,12,3);g.fillStyle='#aaa';g.fillRect(-6,-1,12,1.5);g.fillRect(-6,3,9,1.5);g.restore();
+    g.font='700 10px "Noto Sans SC",sans-serif';g.textAlign='center';g.textBaseline='middle';const tw=g.measureText('批评通知').width+8;g.fillStyle='#c3352b';g.fillRect(x-tw/2,y-26,tw,13);g.fillStyle='#fff';g.fillText('批评通知',x,y-19.5)});
+  g.setTransform(dpr,0,0,dpr,0,0);
+  if(S.t>=930){g.fillStyle=`rgba(255,130,50,${Math.min(.22,(S.t-930)/90*.22)})`;g.fillRect(0,0,cvW,cvH)}
+  // 指向目的地
+  if(S.dest&&!S.arrived){const d=destPoint(),gx=(d.x*TS-camX)*zoom,gy=(d.y*TS-camY)*zoom;
+    if(gx<0||gx>cvW||gy<0||gy>cvH){const px=(P.x*TS-camX)*zoom,py=(P.y*TS-camY)*zoom,a=Math.atan2(gy-py,gx-px);
+      const ax=clamp(px+Math.cos(a)*Math.min(cvW,cvH)*.38,26,cvW-26),ay=clamp(py+Math.sin(a)*Math.min(cvW,cvH)*.38,26,cvH-26);
+      g.save();g.translate(ax,ay);g.rotate(a);g.fillStyle='#ffd23f';g.strokeStyle='#1d2725';g.lineWidth=2;g.beginPath();g.moveTo(18,0);g.lineTo(-11,-12);g.lineTo(-5,0);g.lineTo(-11,12);g.closePath();g.fill();g.stroke();g.restore()}}
+  // 小地圖
+  const ms=Math.min(3,Math.max(2,cvW/150)),mw=MW*ms,mh=MH*ms,mx=cvW-mw-8,my=8;
+  g.fillStyle='rgba(20,26,23,.72)';g.fillRect(mx-3,my-3,mw+6,mh+6);
+  g.fillStyle='#6f9a55';g.fillRect(mx+21*ms,my+9*ms,16*ms,18*ms);g.fillRect(mx+ms,my+22*ms,9*ms,5*ms);
+  ROOMS.forEach(r=>{g.fillStyle=(S.dest===r.id&&!S.arrived)?(pulse>.5?'#ffd23f':r.c):r.c;g.fillRect(mx+r.x*ms,my+r.y*ms,r.w*ms,r.h*ms)});
+  if(S.dest==='fld'&&!S.arrived&&pulse>.5){g.strokeStyle='#ffd23f';g.lineWidth=2;g.strokeRect(mx+FIELD.x*ms,my+FIELD.y*ms,FIELD.w*ms,FIELD.h*ms)}
+  if(exitOpen()){g.fillStyle='#ffd23f';g.fillRect(mx+18*ms,my+(MH-1)*ms,2*ms,ms)}
+  (S.papers||[]).forEach(p=>{g.fillStyle='#ff3b30';g.fillRect(mx+p.x*ms-2,my+p.y*ms-2,4,4)});
+  NPCS.forEach(n=>{g.fillStyle=n.type==='parent'?'#c38bff':'#fff';g.fillRect(mx+n.x*ms-1.5,my+n.y*ms-1.5,3,3)});
+  g.fillStyle='#ffd23f';g.beginPath();g.arc(mx+P.x*ms,my+P.y*ms,3,0,7);g.fill();
+  if(joy){g.strokeStyle='rgba(255,255,255,.5)';g.lineWidth=2;g.beginPath();g.arc(joy.ox,joy.oy,42,0,7);g.stroke();
+    const jx=joy.x-joy.ox,jy=joy.y-joy.oy,L=Math.hypot(jx,jy),k=L>42?42/L:1;g.fillStyle='rgba(255,255,255,.65)';g.beginPath();g.arc(joy.ox+jx*k,joy.oy+jy*k,16,0,7);g.fill()}
+}
+
+function frame(ts){if(!running)return;const dt=Math.max(0,Math.min(.05,(ts-last)/1000||0));last=ts;if(!paused){followRoute(dt);update(dt)};draw();if(running)rafId=requestAnimationFrame(frame)}
+function bindInput(){
+  const cv=$('cv');
+  cv.addEventListener('pointerdown',e=>{autoPath=[];if(paused)return;cv.setPointerCapture(e.pointerId);const r=cv.getBoundingClientRect();joy={id:e.pointerId,ox:e.clientX-r.left,oy:e.clientY-r.top,x:e.clientX-r.left,y:e.clientY-r.top}});
+  cv.addEventListener('pointermove',e=>{if(!joy||e.pointerId!==joy.id)return;const r=cv.getBoundingClientRect();joy.x=e.clientX-r.left;joy.y=e.clientY-r.top});
+  const end=e=>{if(joy&&e.pointerId===joy.id)joy=null};cv.addEventListener('pointerup',end);cv.addEventListener('pointercancel',end);
+  const K={ArrowLeft:1,ArrowRight:1,ArrowUp:1,ArrowDown:1,a:1,d:1,w:1,s:1,A:1,D:1,W:1,S:1};
+  addEventListener('keydown',e=>{autoPath=[];if($('game').hidden)return;if(K[e.key]){if(!$('modal').hidden)return;keys[e.key.length===1?e.key.toLowerCase():e.key]=true;e.preventDefault()}
+    if(e.key==='p'||e.key==='Escape'){if($('modal').hidden)setUserPause(!userPaused)}});
+  addEventListener('keyup',e=>{keys[e.key.length===1?e.key.toLowerCase():e.key]=false});
+  addEventListener('blur',()=>{keys={};joy=null});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden&&!$('game').hidden&&$('modal').hidden)setUserPause(true)});
+  $('pauseBtn').onclick=()=>setUserPause(!userPaused);
+  $('sndBtn').onclick=()=>{AU.init();AU.setOn(!AU.on);syncAudioBtns()};
+  $('voBtn').onclick=()=>{VO.setAuto(!VO.auto);syncAudioBtns()};
+  syncAudioBtns();
+  if(window.ResizeObserver)new ResizeObserver(resize).observe($('stage'));else addEventListener('resize',resize);
+}
+if(typeof document!=='undefined'&&document.getElementById('main')){
+  buildWorld();buildStatic();bindInput();renderStart();
+  if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>buildStatic());
+}
+
+
+
+</script></body></html>
